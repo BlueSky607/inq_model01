@@ -99,7 +99,7 @@ def get_chatgpt_response(prompt):
 
 # 페이지 1: 학번 및 이름 입력
 def page_1():
-    st.title("보라중학교 탐구 도우미 챗봇 P1")
+    st.title("단국중학교 탐구 도우미 챗봇 P1")
     st.write("학번과 이름을 입력한 뒤 '다음' 버튼을 눌러주세요.")
 
     if "user_number" not in st.session_state:
