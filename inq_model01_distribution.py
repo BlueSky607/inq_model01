@@ -207,13 +207,11 @@ def page_3():
     st.title("수학여행 도우미 활용하기")
     st.write("수학여행 도우미와 대화를 나누며 수학을 설계하세요.")
 
-    # 학번과 이름 확인
     if not st.session_state.get("user_number") or not st.session_state.get("user_name"):
         st.error("학번과 이름이 누락되었습니다. 다시 입력해주세요.")
         st.session_state["step"] = 1
         st.rerun()
 
-    # 대화 기록 초기화
     if "messages" not in st.session_state:
         st.session_state["messages"] = []
 
@@ -223,7 +221,6 @@ def page_3():
     if "recent_message" not in st.session_state:
         st.session_state["recent_message"] = {"user": "", "assistant": ""}
 
-    # 대화 UI
     user_input = st.text_area(
         "You: ",
         value=st.session_state["user_input_temp"],
@@ -231,16 +228,24 @@ def page_3():
         on_change=lambda: st.session_state.update({"user_input_temp": st.session_state["user_input"]}),
     )
 
-    if st.button("전송") and user_input.strip():
-        # GPT 응답 가져오기
-        assistant_response = get_chatgpt_response(user_input)
+    col1, col2 = st.columns([1, 1])
 
-        # 최근 대화 저장
-        st.session_state["recent_message"] = {"user": user_input, "assistant": assistant_response}
+    with col1:
+        if st.button("전송"):
+            if user_input.strip():
+                assistant_response = get_chatgpt_response(user_input)
+                st.session_state["recent_message"] = {"user": user_input, "assistant": assistant_response}
+                st.session_state["user_input_temp"] = ""
+                st.rerun()
 
-        # 사용자 입력을 초기화하고 페이지를 새로고침
-        st.session_state["user_input_temp"] = ""
-        st.rerun()
+    with col2:
+        if st.button("마침"):
+            # 마침 버튼 클릭 시 내부적으로 '궁금한 건 다 물어봤어' 전송
+            final_input = "궁금한 건 다 물어봤어"
+            assistant_response = get_chatgpt_response(final_input)
+            st.session_state["recent_message"] = {"user": final_input, "assistant": assistant_response}
+            st.session_state["user_input_temp"] = ""
+            st.rerun()
 
     # 최근 대화 출력
     st.subheader("📌 최근 대화")
@@ -261,19 +266,15 @@ def page_3():
     else:
         st.write("아직 대화 기록이 없습니다.")
 
-    col1, col2 = st.columns([1, 1])
-
-    # 이전 버튼
-    with col1:
+    col3, col4 = st.columns([1, 1])
+    with col3:
         if st.button("이전"):
             st.session_state["step"] = 2
             st.rerun()
-
-    # 다음 버튼
-    with col2:
+    with col4:
         if st.button("다음", key="page3_next_button"):
             st.session_state["step"] = 4
-            st.session_state["feedback_saved"] = False  # 피드백 재생성 플래그 초기화
+            st.session_state["feedback_saved"] = False
             st.rerun()
 
 # 피드백 저장 함수
