@@ -4,7 +4,7 @@ import os
 import json
 from dotenv import load_dotenv
 from datetime import datetime
-from pymongo import MongoClient
+from pymongo import MongoClient as PyMongoClient
 import streamlit as st
 
 
@@ -17,8 +17,8 @@ MODEL = 'gpt-4o'
 client = OpenAI(api_key=OPENAI_API_KEY)
 
 # MongoDB 설정
-client = MongoClient(st.secrets["MONGO_URI"])
-db = client[st.secrets["MONGO_DB"]]
+mongo_client = PyMongoClient(st.secrets["MONGO_URI"])
+db = mongo_client[st.secrets["MONGO_DB"]]
 collection = db[st.secrets["MONGO_COLLECTION"]]
 collection_feedback = db[st.secrets["MONGO_COLLECTION_FEEDBACK"]]
 
@@ -123,7 +123,7 @@ def save_to_mongo(all_data):
 
     finally:
         if client:
-            client.close()
+           mongo_client.close()
 
 
 # GPT 응답 생성 함수
