@@ -20,9 +20,10 @@ def get_mongo_client():
     return pymongo.MongoClient(st.secrets["MONGO_URI"])
 
 mongo_client = pymongo.MongoClient(st.secrets["MONGO_URI"])
-mongo_db = mongo_client['qua_db']  # DB 이름 변경
-qna_collection = mongo_db['qna']  # 콜렉션 이름 변경
-feedback_collection = mongo_db['feedback']  # 피드백 저장을 위한 콜렉션 추가
+mongo_db = mongo_client[st.secrets["MONGO_DB"]]
+qna_collection = mongo_db[st.secrets["MONGO_COLLECTION_QNA"]]
+feedback_collection = mongo_db[st.secrets["MONGO_COLLECTION_FEEDBACK"]]
+
 
 # MongoDB 저장 함수 (대화 기록)
 def save_to_db(all_data):
@@ -71,41 +72,19 @@ def save_feedback_to_db(feedback):
         st.error(f"MongoDB 저장 중 오류가 발생했습니다: {e}")
         return False
 
+# 아래 나머지 코드는 기존과 동일 (GPT 호출, 페이지 구성 등)
+
 # GPT 응답 생성 함수
 def get_chatgpt_response(prompt):
-    try:
-        response = client.chat.completions.create(
-            model=MODEL,
-            messages=[{"role": "system", "content": "수학여행 도우미 챗봇"}] + st.session_state["messages"] + [{"role": "user", "content": prompt}],
-        )
+    response = client.chat.completions.create(
+        model=MODEL,
+        messages=[{"role": "system", "content": initial_prompt}] + st.session_state["messages"] + [{"role": "user", "content": prompt}],
+    )
+    answer = response.choices[0].message.content
 
-        # 응답 로그 출력
-        st.write("API 응답:", response)
-
-        # 응답 내용이 정상적으로 들어있는지 확인 (응답 구조 변경을 반영)
-        if 'choices' in response and len(response['choices']) > 0:
-            # 메시지가 존재하는지 확인
-            if 'message' in response['choices'][0] and 'content' in response['choices'][0]['message']:
-                answer = response['choices'][0]['message']['content']
-            else:
-                raise KeyError("Expected keys not found in response['choices'][0]['message']")
-        else:
-            raise KeyError("Expected 'choices' key not found or it's empty")
-
-        # 대화 저장
-        st.session_state["messages"].append({"role": "user", "content": prompt})
-        st.session_state["messages"].append({"role": "assistant", "content": answer})
-        return answer
-
-    except KeyError as e:
-        st.error(f"API 응답에서 예상한 키가 없습니다: {e}")
-        st.write("응답 구조:", response)  # 응답 구조를 자세히 출력
-        return "오류가 발생했습니다. 잠시 후 다시 시도해주세요."
-
-    except Exception as e:
-        st.error(f"예상치 못한 오류가 발생했습니다: {e}")
-        st.write("응답 구조:", response)  # 응답 구조를 자세히 출력
-        return "오류가 발생했습니다. 잠시 후 다시 시도해주세요."
+    st.session_state["messages"].append({"role": "user", "content": prompt})
+    st.session_state["messages"].append({"role": "assistant", "content": answer})
+    return answer
 
 
 # 페이지 1: 학번 및 이름 입력
@@ -140,7 +119,7 @@ def page_2():
 
 ① 인공지능에게 수학 문제를 알려주세요.
 
-② LATEx기반으로 문제 입력시 (1)문장 속 수식은 `$수식$`, (2)블록 수식은 `$$ 수식 $$` 형식으로 입력해주세요.
+② LATex기반으로 문제 입력시 (1)문장 속 수식은 `$수식$`, (2)블록 수식은 `$$ 수식 $$` 형식으로 입력해주세요.
 
 ③ 인공지능은 문제 해결에 필요한 수학 개념, 공식, 해결 전략, 접근 방향을 단계적으로 안내할 거예요. 궁금한 점은 언제든지 질문하세요.
 
@@ -237,6 +216,46 @@ def page_3():
             st.session_state["feedback_saved"] = False
             st.rerun()
 
+# 피드백 저장 함수
+def save_feedback_to_db(feedback):
+    number = st.session_state.get('user_number', '').strip()
+    name = st.session_state.get('user_name', '').strip()
+
+    if not number or not name:  # 학번과 이름 확인
+        st.error("사용자 학번과 이름을 입력해야 합니다.")
+        return False  # 저장 실패
+
+    try:
+        db = pymysql.connect(
+            host=st.secrets["DB_HOST"],
+            user=st.secrets["DB_USER"],
+            password=st.secrets["DB_PASSWORD"],
+            database=st.secrets["DB_DATABASE"],
+            charset="utf8mb4",  # UTF-8 지원
+            autocommit=True  # 자동 커밋 활성화
+        )
+        cursor = db.cursor()
+        now = datetime.now()
+
+        sql = """
+        INSERT INTO feedback (number, name, feedback, time)
+        VALUES (%s, %s, %s, %s)
+        """
+        val = (number, name, feedback, now)
+
+        # SQL 실행
+        cursor.execute(sql, val)
+        cursor.close()
+        db.close()
+        st.success("피드백이 성공적으로 저장되었습니다.")
+        return True  # 저장 성공
+    except pymysql.MySQLError as db_err:
+        st.error(f"DB 처리 중 오류가 발생했습니다: {db_err}")
+        return False  # 저장 실패
+    except Exception as e:
+        st.error(f"알 수 없는 오류가 발생했습니다: {e}")
+        return False  # 저장 실패
+
 # 페이지 4: 문제 풀이 과정 출력
 def page_4():
     st.title("수학여행 도우미의 제안")
@@ -303,7 +322,7 @@ def page_4():
         st.session_state["feedback_saved"] = False  # 초기화
 
     if not st.session_state["feedback_saved"]:
-        # 새로운 데이터(all_data_to_store)를 MongoDB에 저장
+        # 새로운 데이터(all_data_to_store)를 MySQL에 저장
         if save_to_db(all_data_to_store):  # 기존 save_to_db 함수에 통합된 데이터 전달
             st.session_state["feedback_saved"] = True  # 저장 성공 시 플래그 설정
         else:
@@ -329,4 +348,3 @@ elif st.session_state["step"] == 3:
     page_3()
 elif st.session_state["step"] == 4:
     page_4()
-
