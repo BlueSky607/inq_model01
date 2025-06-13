@@ -10,8 +10,8 @@ OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
 @st.cache_resource
 def connect_to_mongo():
     client = MongoClient(st.secrets["MONGO_URI"])
-    db = client[st.secrets["DB_DATABASE"]]  # 예: "qna_db"
-    return db["qna"]  # 컬렉션 이름: "qna"
+    db = client[st.secrets["DB_DATABASE"]]  # 여기서 DB_DATABASE 키를 씁니다
+    return db["qna"]  # 컬렉션 이름 "qna" 직접 지정
 
 # 모든 레코드 가져오기
 def fetch_records():
@@ -39,10 +39,6 @@ st.title("학생의 인공지능 사용 내역(교사용)")
 # 비밀번호 입력
 password = st.text_input("비밀번호를 입력하세요", type="password")
 
-# 디버깅용 로그 (선택적 출력)
-# st.write("🛠️ 입력한 비밀번호:", password)
-# st.write("🔒 설정된 비밀번호 (secrets):", st.secrets["PASSWORD"])
-
 if password == st.secrets["PASSWORD"]:
     records = fetch_records()
 
@@ -58,7 +54,6 @@ if password == st.secrets["PASSWORD"]:
         if record and "chat" in record:
             try:
                 chat = record["chat"]
-                # chat이 문자열이면 파싱
                 if isinstance(chat, str):
                     chat = json.loads(chat)
 
