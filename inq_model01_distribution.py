@@ -15,14 +15,15 @@ MODEL = 'gpt-4o'
 client = OpenAI(api_key=OPENAI_API_KEY)
 
 # MongoDB 클라이언트 초기화 (글로벌로 한 번만)
-@st.experimental_singleton
+@st.cache_resource
 def get_mongo_client():
     return pymongo.MongoClient(st.secrets["MONGO_URI"])
 
-mongo_client = get_mongo_client()
+mongo_client = pymongo.MongoClient(st.secrets["MONGO_URI"])
 mongo_db = mongo_client[st.secrets["MONGO_DB"]]
 qna_collection = mongo_db[st.secrets["MONGO_COLLECTION_QNA"]]
 feedback_collection = mongo_db[st.secrets["MONGO_COLLECTION_FEEDBACK"]]
+
 
 # MongoDB 저장 함수 (대화 기록)
 def save_to_db(all_data):
