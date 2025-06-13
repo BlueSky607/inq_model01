@@ -9,7 +9,7 @@ from datetime import datetime
 # 환경 변수 로드
 load_dotenv()
 OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
-MODEL = 'gpt-4'
+MODEL = 'gpt-4o'
 
 # OpenAI API 설정
 client = OpenAI(api_key=OPENAI_API_KEY)
