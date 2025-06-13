@@ -14,6 +14,14 @@ MODEL = 'gpt-4o'
 # OpenAI API 설정
 client = OpenAI(api_key=OPENAI_API_KEY)
 
+# MongoDB 설정
+client = MongoClient(st.secrets["MONGODB_URI"])
+db = client["qna_db"]
+collection = db["qna"]
+
+# 페이지 기본 설정
+st.set_page_config(page_title="수학여행 도우미", page_icon="🧠", layout="wide")
+
 # 초기 프롬프트
 initial_prompt = '''
 너는 '수학여행 도우미'라는 이름의 챗봇으로, 고등학생의 수학 문제 해결을 돕는 역할을 수행한다.
@@ -71,47 +79,44 @@ initial_prompt = '''
 - 수학적 결과는 LaTeX 수식 형태로 간단히 출력하고, 설명은 생략한다.
 '''
 
-# MySQL 저장 함수
-def save_to_db(all_data):
+# 세션 상태 초기화
+if "messages" not in st.session_state:
+    st.session_state["messages"] = []
+
+# MongoDB 저장 함수
+def save_to_mongodb(all_data):
     number = st.session_state.get('user_number', '').strip()
     name = st.session_state.get('user_name', '').strip()
 
-    if not number or not name:  # 학번과 이름 확인
+    if not number or not name:
         st.error("사용자 학번과 이름을 입력해야 합니다.")
-        return False  # 저장 실패
+        return False
 
     try:
-        db = pymysql.connect(
-            host=st.secrets["DB_HOST"],
-            user=st.secrets["DB_USER"],
-            password=st.secrets["DB_PASSWORD"],
-            database=st.secrets["DB_DATABASE"],
-            charset="utf8mb4",  # UTF-8 지원
-            autocommit=True  # 자동 커밋 활성화
-        )
-        cursor = db.cursor()
+        # MongoDB 클라이언트 설정
+        client = MongoClient(st.secrets["MONGO_URI"])
+        db = client[st.secrets["qna_db"]]
+        collection = db[st.secrets["qna"]]
+
         now = datetime.now()
 
-        sql = """
-        INSERT INTO qna (number, name, chat, time)
-        VALUES (%s, %s, %s, %s)
-        """
-        # all_data를 JSON 문자열로 변환하여 저장
-        chat = json.dumps(all_data, ensure_ascii=False)  # 대화 및 피드백 내용 통합
+        # 저장할 문서 구성
+        document = {
+            "number": number,
+            "name": name,
+            "chat": all_data,  # 이미 JSON 구조로 되어 있으므로 변환 불필요
+            "time": now
+        }
 
-        val = (number, name, chat, now)
+        collection.insert_one(document)
+        return True
 
-        # SQL 실행
-        cursor.execute(sql, val)
-        cursor.close()
-        db.close()
-        return True  # 저장 성공
-    except pymysql.MySQLError as db_err:
-        st.error(f"DB 처리 중 오류가 발생했습니다: {db_err}")
-        return False  # 저장 실패
     except Exception as e:
-        st.error(f"알 수 없는 오류가 발생했습니다: {e}")
-        return False  # 저장 실패
+        st.error(f"MongoDB 저장 중 오류가 발생했습니다: {e}")
+        return False
+
+    finally:
+        client.close()
 
 # GPT 응답 생성 함수
 def get_chatgpt_response(prompt):
