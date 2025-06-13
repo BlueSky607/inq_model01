@@ -97,8 +97,8 @@ def save_to_mongodb(all_data):
     try:
         # MongoDB 클라이언트 설정
         client = MongoClient(st.secrets["MONGO_URI"])
-        db = client[st.secrets["qna_db"]]
-        collection = db[st.secrets["qna"]]
+        db = client[st.secrets["MONGO_DB"]]
+        collection = db[st.secrets["MONGO_COLLECTION"]]
 
         now = datetime.now()
 
