@@ -73,30 +73,40 @@ def save_feedback_to_db(feedback):
 
 # GPT 응답 생성 함수
 def get_chatgpt_response(prompt):
-    response = client.chat.completions.create(
-        model=MODEL,
-        messages=[{"role": "system", "content": "수학여행 도우미 챗봇"}] + st.session_state["messages"] + [{"role": "user", "content": prompt}],
-    )
-
-    # 응답 로그 출력
-    st.write("API 응답:", response)
-
-    # 응답 내용이 정상적으로 들어있는지 확인
     try:
-        answer = response['choices'][0]['message']['content']
+        response = client.chat.completions.create(
+            model=MODEL,
+            messages=[{"role": "system", "content": "수학여행 도우미 챗봇"}] + st.session_state["messages"] + [{"role": "user", "content": prompt}],
+        )
+
+        # 응답 로그 출력
+        st.write("API 응답:", response)
+
+        # 응답 내용이 정상적으로 들어있는지 확인 (응답 구조 변경을 반영)
+        if 'choices' in response and len(response['choices']) > 0:
+            # 메시지가 존재하는지 확인
+            if 'message' in response['choices'][0] and 'content' in response['choices'][0]['message']:
+                answer = response['choices'][0]['message']['content']
+            else:
+                raise KeyError("Expected keys not found in response['choices'][0]['message']")
+        else:
+            raise KeyError("Expected 'choices' key not found or it's empty")
+
+        # 대화 저장
         st.session_state["messages"].append({"role": "user", "content": prompt})
         st.session_state["messages"].append({"role": "assistant", "content": answer})
         return answer
+
     except KeyError as e:
         st.error(f"API 응답에서 예상한 키가 없습니다: {e}")
         st.write("응답 구조:", response)  # 응답 구조를 자세히 출력
         return "오류가 발생했습니다. 잠시 후 다시 시도해주세요."
 
-    answer = response['choices'][0]['message']['content']
+    except Exception as e:
+        st.error(f"예상치 못한 오류가 발생했습니다: {e}")
+        st.write("응답 구조:", response)  # 응답 구조를 자세히 출력
+        return "오류가 발생했습니다. 잠시 후 다시 시도해주세요."
 
-    st.session_state["messages"].append({"role": "user", "content": prompt})
-    st.session_state["messages"].append({"role": "assistant", "content": answer})
-    return answer
 
 # 페이지 1: 학번 및 이름 입력
 def page_1():
