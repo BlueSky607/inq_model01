@@ -77,6 +77,21 @@ def get_chatgpt_response(prompt):
         model=MODEL,
         messages=[{"role": "system", "content": "수학여행 도우미 챗봇"}] + st.session_state["messages"] + [{"role": "user", "content": prompt}],
     )
+
+    # 응답 로그 출력
+    st.write("API 응답:", response)
+
+    # 응답 내용이 정상적으로 들어있는지 확인
+    try:
+        answer = response['choices'][0]['message']['content']
+        st.session_state["messages"].append({"role": "user", "content": prompt})
+        st.session_state["messages"].append({"role": "assistant", "content": answer})
+        return answer
+    except KeyError as e:
+        st.error(f"API 응답에서 예상한 키가 없습니다: {e}")
+        st.write("응답 구조:", response)  # 응답 구조를 자세히 출력
+        return "오류가 발생했습니다. 잠시 후 다시 시도해주세요."
+
     answer = response['choices'][0]['message']['content']
 
     st.session_state["messages"].append({"role": "user", "content": prompt})
