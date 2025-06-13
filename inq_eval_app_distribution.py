@@ -10,8 +10,8 @@ OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
 @st.cache_resource
 def connect_to_mongo():
     client = MongoClient(st.secrets["MONGO_URI"])
-    db = client[st.secrets["DB_DATABASE"]]  # 여기서 DB_DATABASE 키를 씁니다
-    return db["qna"]  # 컬렉션 이름 "qna" 직접 지정
+    db = client[st.secrets["MONGO_DB"]]  # 수정된 부분
+    return db[st.secrets["MONGO_COLLECTION_QNA"]]  # 수정된 부분
 
 # 모든 레코드 가져오기
 def fetch_records():
