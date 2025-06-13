@@ -1,4 +1,5 @@
 streamlit
+pymongo
 pymysql
 python-dotenv
 cryptography>=41.0.0
