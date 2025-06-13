@@ -1,11 +1,11 @@
 import pymysql
-import streamlit as st
 from openai import OpenAI
 import os
 import json
 from dotenv import load_dotenv
 from datetime import datetime
 from pymongo import MongoClient
+import streamlit as st
 
 
 # 환경 변수 로드
@@ -17,9 +17,10 @@ MODEL = 'gpt-4o'
 client = OpenAI(api_key=OPENAI_API_KEY)
 
 # MongoDB 설정
-client = MongoClient(st.secrets["MONGODB_URI"])
-db = client["qna_db"]
-collection = db["qna"]
+client = MongoClient(st.secrets["MONGO_URI"])
+db = client[st.secrets["MONGO_DB"]]
+collection = db[st.secrets["MONGO_COLLECTION"]]
+collection_feedback = db[st.secrets["MONGO_COLLECTION_FEEDBACK"]]
 
 # 페이지 기본 설정
 st.set_page_config(page_title="수학여행 도우미", page_icon="🧠", layout="wide")
@@ -86,7 +87,7 @@ if "messages" not in st.session_state:
     st.session_state["messages"] = []
 
 # MongoDB 저장 함수
-def save_to_mongodb(all_data):
+def save_to_mongo(all_data):
     number = st.session_state.get('user_number', '').strip()
     name = st.session_state.get('user_name', '').strip()
 
@@ -94,19 +95,22 @@ def save_to_mongodb(all_data):
         st.error("사용자 학번과 이름을 입력해야 합니다.")
         return False
 
+    client = None  # 먼저 정의
+
     try:
-        # MongoDB 클라이언트 설정
+        from pymongo import MongoClient
+        from datetime import datetime
+
         client = MongoClient(st.secrets["MONGO_URI"])
         db = client[st.secrets["MONGO_DB"]]
         collection = db[st.secrets["MONGO_COLLECTION"]]
 
         now = datetime.now()
 
-        # 저장할 문서 구성
         document = {
             "number": number,
             "name": name,
-            "chat": all_data,  # 이미 JSON 구조로 되어 있으므로 변환 불필요
+            "chat": all_data,
             "time": now
         }
 
@@ -118,7 +122,9 @@ def save_to_mongodb(all_data):
         return False
 
     finally:
-        client.close()
+        if client:
+            client.close()
+
 
 # GPT 응답 생성 함수
 def get_chatgpt_response(prompt):
