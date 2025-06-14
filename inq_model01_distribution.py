@@ -84,7 +84,13 @@ initial_prompt = '''
 
 # 세션 상태 초기화
 if "messages" not in st.session_state:
-    st.session_state["messages"] = []
+    st.session_state.messages = []
+if "answer_submitted" not in st.session_state:
+    st.session_state.answer_submitted = False
+if "has_answer" not in st.session_state:
+    st.session_state.has_answer = False
+if "show_next" not in st.session_state:
+    st.session_state.show_next = False
 
 # MongoDB 저장 함수
 def save_to_mongo(all_data):
@@ -196,47 +202,23 @@ def page_2():
 # 페이지 3: GPT와 대화
 def page_3():
     st.title("수학여행 도우미 활용하기")
-    st.write("수학여행 도우미와 대화를 나누며 수학을 설계하세요.")
+    user_input = st.text_area("You:", value="", key="user_input")
 
-    if not st.session_state.get("user_number") or not st.session_state.get("user_name"):
-        st.error("학번과 이름이 누락되었습니다. 다시 입력해주세요.")
-        st.session_state["step"] = 1
-        st.rerun()
-
-    if "messages" not in st.session_state:
-        st.session_state["messages"] = []
-
-    if "user_input_temp" not in st.session_state:
-        st.session_state["user_input_temp"] = ""
-
-    if "recent_message" not in st.session_state:
-        st.session_state["recent_message"] = {"user": "", "assistant": ""}
-
-    user_input = st.text_area(
-        "You: ",
-        value=st.session_state["user_input_temp"],
-        key="user_input",
-        on_change=lambda: st.session_state.update({"user_input_temp": st.session_state["user_input"]}),
-    )
-
-    col1, col2 = st.columns([1, 1])
-
+    col1, col2 = st.columns(2)
     with col1:
         if st.button("전송"):
             if user_input.strip():
-                assistant_response = get_chatgpt_response(user_input)
-                st.session_state["recent_message"] = {"user": user_input, "assistant": assistant_response}
-                st.session_state["user_input_temp"] = ""
-                st.rerun()
-
+                get_chatgpt_response(user_input)
+                st.experimental_rerun()
     with col2:
         if st.button("마침"):
-            # 마침 버튼 클릭 시 내부적으로 '궁금한 건 다 물어봤어' 전송
-            final_input = "궁금한 건 다 물어봤어"
-            assistant_response = get_chatgpt_response(final_input)
-            st.session_state["recent_message"] = {"user": final_input, "assistant": assistant_response}
-            st.session_state["user_input_temp"] = ""
-            st.rerun()
+            # 종료 조건 검사
+            st.session_state.answer_submitted = True
+            st.session_state.has_answer = bool(user_input.strip())
+            # 학생이 입력한 마지막 텍스트도 메시지로 추가
+            get_chatgpt_response("궁금한 건 다 물어봤어")
+            st.session_state.show_next = True
+            st.experimental_rerun()
 
     # 최근 대화 출력
     st.subheader("📌 최근 대화")
@@ -267,6 +249,29 @@ def page_3():
             st.session_state["step"] = 4
             st.session_state["feedback_saved"] = False
             st.rerun()
+
+
+ # 마침 후 요약 + 다음 버튼 안내
+    if st.session_state.answer_submitted and st.session_state.show_next:
+        if st.session_state.has_answer:
+            st.success("✅ 정답을 제시했네요! 요약을 드릴게요:")
+            st.write("- 학생의 답변이 포함된 요약")
+            st.write("- 사용한 전략 및 개념")
+        else:
+            st.info("😊 정답 제시는 없었지만 전략은 잘 시도했어요. 요약입니다:")
+            st.write("- 풀이 전략 및 접근 방식 요약")
+        if st.button("다음"):
+            # 저장 & 종료
+            all_data = st.session_state.messages.copy()
+            if save_to_mongo(all_data):
+                st.success("✅ 대화가 저장되었어요. 프로그램을 종료합니다.")
+                if st.button("새로운 탐구 시작"):
+                    for k in list(st.session_state.keys()):
+                        del st.session_state[k]
+                    st.experimental_rerun()
+            else:
+                st.error("❗ 저장에 실패했습니다. 다시 시도해주세요.")
+
 
 # 피드백 저장 함수
 def save_feedback_to_db(feedback):
