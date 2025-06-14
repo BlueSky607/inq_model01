@@ -133,13 +133,11 @@ def page_1():
     st.title("수학여행 도우미 챗봇 M1")
     st.write("학번과 이름을 입력한 뒤 '다음' 버튼을 눌러주세요.")
 
-    # 세션 상태에 초기값 설정 (없으면 빈 문자열)
     if "user_number" not in st.session_state:
         st.session_state["user_number"] = ""
     if "user_name" not in st.session_state:
         st.session_state["user_name"] = ""
 
-    # 텍스트 입력창, key와 세션 상태 key를 동일하게 사용
     user_number = st.text_input("학번", value=st.session_state["user_number"], key="user_number")
     user_name = st.text_input("이름", value=st.session_state["user_name"], key="user_name")
 
@@ -147,9 +145,11 @@ def page_1():
         if not user_number.strip() or not user_name.strip():
             st.error("학번과 이름을 모두 입력해주세요.")
         else:
-            # 텍스트 입력의 key와 세션 상태 키가 같으므로 별도 저장 불필요
+            # user_number, user_name은 key가 같아서 세션에 이미 저장됨
             st.session_state["step"] = 2
-            st.experimental_rerun()
+            st.experimental_rerun()  # 반드시 버튼 클릭 if문 내부
+
+
 
 
 # 페이지 2: 사용법 안내
