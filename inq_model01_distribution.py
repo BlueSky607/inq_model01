@@ -1,7 +1,6 @@
 import pymysql
 from openai import OpenAI
 import os
-import json
 from dotenv import load_dotenv
 from datetime import datetime
 from pymongo import MongoClient as PyMongoClient
@@ -16,7 +15,7 @@ MODEL = 'gpt-4o'
 # OpenAI API 설정
 client = OpenAI(api_key=OPENAI_API_KEY)
 
-# MongoDB 설정
+# MongoDB 설정 (전역 연결)
 mongo_client = PyMongoClient(st.secrets["MONGO_URI"])
 db = mongo_client[st.secrets["MONGO_DB"]]
 collection = db[st.secrets["MONGO_COLLECTION"]]
@@ -101,36 +100,20 @@ def save_to_mongo(all_data):
         st.error("사용자 학번과 이름을 입력해야 합니다.")
         return False
 
-    client = None  # 먼저 정의
-
     try:
-        from pymongo import MongoClient
-        from datetime import datetime
-
-        client = MongoClient(st.secrets["MONGO_URI"])
-        db = client[st.secrets["MONGO_DB"]]
-        collection = db[st.secrets["MONGO_COLLECTION"]]
-
         now = datetime.now()
-
         document = {
             "number": number,
             "name": name,
             "chat": all_data,
             "time": now
         }
-
         collection.insert_one(document)
         return True
 
     except Exception as e:
         st.error(f"MongoDB 저장 중 오류가 발생했습니다: {e}")
         return False
-
-    finally:
-        if client:
-           mongo_client.close()
-
 
 # GPT 응답 생성 함수
 def get_chatgpt_response(prompt):
@@ -164,7 +147,7 @@ def page_1():
             st.error("학번과 이름을 모두 입력해주세요.")
         else:
             st.session_state["step"] = 2
-            st.rerun()
+            st.experimental_rerun()
 
 # 페이지 2: 사용법 안내
 def page_2():
@@ -192,12 +175,12 @@ def page_2():
     with col1:
         if st.button("이전"):
             st.session_state["step"] = 1
-            st.rerun()
+            st.experimental_rerun()
 
     with col2:
         if st.button("다음", key="page2_next_button"):
             st.session_state["step"] = 3
-            st.rerun()
+            st.experimental_rerun()
 
 # 페이지 3: GPT와 대화
 def page_3():
@@ -212,199 +195,69 @@ def page_3():
                 st.experimental_rerun()
     with col2:
         if st.button("마침"):
-            # 종료 조건 검사
-            st.session_state.answer_submitted = True
-            st.session_state.has_answer = bool(user_input.strip())
-            # 학생이 입력한 마지막 텍스트도 메시지로 추가
-            get_chatgpt_response("궁금한 건 다 물어봤어")
-            st.session_state.show_next = True
+            # '마침' 버튼 클릭시 종료 조건 체크 후 요약 안내
+            st.session_state["answer_submitted"] = True
+            st.session_state["show_next"] = True
+
+    # 대화 내용 출력
+    for msg in st.session_state.messages:
+        if msg["role"] == "user":
+            st.markdown(f"**You:** {msg['content']}")
+        else:
+            # assistant 메시지는 LaTeX를 포함할 수 있으므로 그대로 출력
+            st.markdown(f"**수학여행 도우미:** {msg['content']}")
+
+    # 종료 후 '다음' 버튼 안내
+    if st.session_state.get("show_next", False):
+        st.info("수고하셨어요! 이제 다음 단계로 넘어가세요.")
+        if st.button("다음"):
+            st.session_state["step"] = 4
             st.experimental_rerun()
 
-    # 최근 대화 출력
-    st.subheader("📌 최근 대화")
-    if st.session_state["recent_message"]["user"] or st.session_state["recent_message"]["assistant"]:
-        st.write(f"**You:** {st.session_state['recent_message']['user']}")
-        st.write(f"**수학여행 도우미:** {st.session_state['recent_message']['assistant']}")
-    else:
-        st.write("아직 최근 대화가 없습니다.")
-
-    # 누적 대화 출력
-    st.subheader("📜 누적 대화 목록")
-    if st.session_state["messages"]:
-        for message in st.session_state["messages"]:
-            if message["role"] == "user":
-                st.write(f"**You:** {message['content']}")
-            elif message["role"] == "assistant":
-                st.write(f"**수학여행 도우미:** {message['content']}")
-    else:
-        st.write("아직 대화 기록이 없습니다.")
-
-    col3, col4 = st.columns([1, 1])
-    with col3:
-        if st.button("이전"):
-            st.session_state["step"] = 2
-            st.rerun()
-    with col4:
-        if st.button("다음", key="page3_next_button"):
-            st.session_state["step"] = 4
-            st.session_state["feedback_saved"] = False
-            st.rerun()
-
-
- # 마침 후 요약 + 다음 버튼 안내
-    if st.session_state.answer_submitted and st.session_state.show_next:
-        if st.session_state.has_answer:
-            st.success("✅ 정답을 제시했네요! 요약을 드릴게요:")
-            st.write("- 학생의 답변이 포함된 요약")
-            st.write("- 사용한 전략 및 개념")
-        else:
-            st.info("😊 정답 제시는 없었지만 전략은 잘 시도했어요. 요약입니다:")
-            st.write("- 풀이 전략 및 접근 방식 요약")
-        if st.button("다음"):
-            # 저장 & 종료
-            all_data = st.session_state.messages.copy()
-            if save_to_mongo(all_data):
-                st.success("✅ 대화가 저장되었어요. 프로그램을 종료합니다.")
-                if st.button("새로운 탐구 시작"):
-                    for k in list(st.session_state.keys()):
-                        del st.session_state[k]
-                    st.experimental_rerun()
-            else:
-                st.error("❗ 저장에 실패했습니다. 다시 시도해주세요.")
-
-
-# 피드백 저장 함수
-def save_feedback_to_db(feedback):
-    number = st.session_state.get('user_number', '').strip()
-    name = st.session_state.get('user_name', '').strip()
-
-    if not number or not name:  # 학번과 이름 확인
-        st.error("사용자 학번과 이름을 입력해야 합니다.")
-        return False  # 저장 실패
-
-    try:
-        db = pymysql.connect(
-            host=st.secrets["DB_HOST"],
-            user=st.secrets["DB_USER"],
-            password=st.secrets["DB_PASSWORD"],
-            database=st.secrets["DB_DATABASE"],
-            charset="utf8mb4",  # UTF-8 지원
-            autocommit=True  # 자동 커밋 활성화
-        )
-        cursor = db.cursor()
-        now = datetime.now()
-
-        sql = """
-        INSERT INTO feedback (number, name, feedback, time)
-        VALUES (%s, %s, %s, %s)
-        """
-        val = (number, name, feedback, now)
-
-        # SQL 실행
-        cursor.execute(sql, val)
-        cursor.close()
-        db.close()
-        st.success("피드백이 성공적으로 저장되었습니다.")
-        return True  # 저장 성공
-    except pymysql.MySQLError as db_err:
-        st.error(f"DB 처리 중 오류가 발생했습니다: {db_err}")
-        return False  # 저장 실패
-    except Exception as e:
-        st.error(f"알 수 없는 오류가 발생했습니다: {e}")
-        return False  # 저장 실패
-
-# 페이지 4: 문제 풀이 과정 출력
+# 페이지 4: 대화 요약 및 피드백 저장
 def page_4():
-    st.title("수학여행 도우미의 제안")
-    st.write("수학여행 도우미가 대화 내용을 정리 중입니다. 잠시만 기다려주세요.")
+    st.title("수학여행 도우미 - 대화 요약 및 피드백 저장")
 
-    # 페이지 4로 돌아올 때마다 새로운 피드백 생성
-    if not st.session_state.get("feedback_saved", False):
-        # 대화 기록을 기반으로 풀이 과정 작성
-        chat_history = "\n".join(f"{msg['role']}: {msg['content']}" for msg in st.session_state["messages"])
-        prompt = f"""
-다음은 학생과 수학여행 도우미의 대화 기록입니다:
-
-{chat_history}
-
----
-
-1. 아래 조건을 반드시 확인하세요:
-
-- 대화 중에 **"[다음] 버튼을 눌러도 됩니다"** 또는 이와 같은 의미의 문장이 포함되어 있는지 철저히 확인하세요.
-- 포함되어 있지 않다면, 아래 문장을 그대로 출력하고 종료하세요:
-  → "[이전] 버튼을 눌러 수학여행 도우미와 더 대화해야 합니다"
-- 실수 방지를 위해 **대화를 끝까지 정밀하게 검토**하세요.
-
----
-
-2. [다음] 버튼을 눌러도 된다는 내용이 포함된 경우, 아래 3가지를 포함하여 피드백을 작성하세요:
-
-📌 **1. 대화 내용 요약**  
-- 학생이 어떤 개념을 시도했고, 어떤 실수를 했으며 어떻게 수정했는지를 중심으로 요약하세요.  
-- 가독성을 위해 문단마다 줄바꿈을 사용하세요.
-
-💬 **2. 문제해결 능력 피드백**  
-- 개념 적용, 전략적 사고, 자기주도성, 오개념 교정 등의 측면에서 평가하세요.
-
-🧾 **3. 수학적 결과 또는 전략 정리 (조건 분기)**
-
-- **학생이 정확한 정답을 제시한 경우**:
-  - 문제 풀이 과정을 간결히 요약하고, LaTeX 수식으로 최종 정답을 제시하세요.
-
-- **정답을 제시하지 못했거나 오답을 제시한 경우**:
-- 문제 해결에 필요한 핵심 개념, 공식, 전략만 정리하세요. 설명은 생략하고 수식만 제시하세요.
-
-반드시 위 형식을 따르고, 항목 순서를 변경하지 마세요.
-"""  
-        # OpenAI API 호출
-        response = client.chat.completions.create(
-            model=MODEL,
-            messages=[{"role": "system", "content": prompt}]
+    if st.session_state.messages:
+        all_chat = "\n".join(
+            [f"{m['role'].capitalize()}: {m['content']}" for m in st.session_state.messages]
         )
-        st.session_state["experiment_plan"] = response.choices[0].message.content
+        st.text_area("전체 대화 기록", all_chat, height=300)
 
-    # 피드백 출력
-    st.subheader("📋 생성된 피드백")
-    st.write(st.session_state["experiment_plan"])
+        if st.button("피드백 저장"):
+            saved = save_to_mongo(all_chat)
+            if saved:
+                st.success("피드백이 저장되었습니다.")
+            else:
+                st.error("피드백 저장에 실패했습니다.")
 
-    # 새로운 변수에 대화 내용과 피드백을 통합
-    if "all_data" not in st.session_state:
-        st.session_state["all_data"] = []
+    if st.button("처음으로"):
+        # 세션 상태 초기화
+        st.session_state.messages = []
+        st.session_state.answer_submitted = False
+        st.session_state.has_answer = False
+        st.session_state.show_next = False
+        st.session_state.step = 1
+        st.experimental_rerun()
 
-    all_data_to_store = st.session_state["messages"] + [{"role": "assistant", "content": st.session_state["experiment_plan"]}]
+# 메인 라우터
+def main():
+    if "step" not in st.session_state:
+        st.session_state["step"] = 1
 
-    # 중복 저장 방지: 피드백 저장 여부 확인
-    if "feedback_saved" not in st.session_state:
-        st.session_state["feedback_saved"] = False  # 초기화
+    step = st.session_state["step"]
 
-    if not st.session_state["feedback_saved"]:
-        # 새로운 데이터(all_data_to_store)를 MySQL에 저장
-       if save_to_mongo(all_data_to_store):
-         st.session_state["feedback_saved"] = True
-       else:
-         st.error("저장에 실패했습니다. 다시 시도해주세요.")
+    if step == 1:
+        page_1()
+    elif step == 2:
+        page_2()
+    elif step == 3:
+        page_3()
+    elif step == 4:
+        page_4()
 
-    # 이전 버튼 (페이지 3으로 이동 시 피드백 삭제)
-    if st.button("이전", key="page4_back_button"):
-        st.session_state["step"] = 3
-        if "experiment_plan" in st.session_state:
-            del st.session_state["experiment_plan"]  # 피드백 삭제
-        st.session_state["feedback_saved"] = False  # 피드백 재생성 플래그 초기화
-        st.rerun()
-
-# 메인 로직
-if "step" not in st.session_state:
-    st.session_state["step"] = 1
-
-if st.session_state["step"] == 1:
-    page_1()
-elif st.session_state["step"] == 2:
-    page_2()
-elif st.session_state["step"] == 3:
-    page_3()
-elif st.session_state["step"] == 4:
-    page_4()
+if __name__ == "__main__":
+    main()
 
 
 
