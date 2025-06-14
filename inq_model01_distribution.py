@@ -133,21 +133,18 @@ def page_1():
     st.title("수학여행 도우미 챗봇 M1")
     st.write("학번과 이름을 입력한 뒤 '다음' 버튼을 눌러주세요.")
 
-    if "user_number" not in st.session_state:
-        st.session_state["user_number"] = ""
-    if "user_name" not in st.session_state:
-        st.session_state["user_name"] = ""
+    user_number = st.text_input("학번", key="user_number")
+    user_name = st.text_input("이름", key="user_name")
 
-    st.session_state["user_number"] = st.text_input("학번", value=st.session_state["user_number"])
-    st.session_state["user_name"] = st.text_input("이름", value=st.session_state["user_name"])
+    st.write(" ")  # Add space
 
-    st.write(" ")  # Add space to position the button at the bottom properly
     if st.button("다음", key="page1_next_button"):
-        if st.session_state["user_number"].strip() == "" or st.session_state["user_name"].strip() == "":
+        if user_number.strip() == "" or user_name.strip() == "":
             st.error("학번과 이름을 모두 입력해주세요.")
         else:
             st.session_state["step"] = 2
             st.experimental_rerun()
+
 
 # 페이지 2: 사용법 안내
 def page_2():
