@@ -194,6 +194,7 @@ def page_2():
             st.rerun()
 
 # 페이지 3: GPT와 대화
+# 페이지 3: GPT와 대화
 def page_3():
     st.title("수학여행 도우미 활용하기")
     st.write("수학여행 도우미와 대화를 나누며 수학을 설계하세요.")
@@ -264,6 +265,7 @@ def page_3():
             st.rerun()
     with col4:
         if st.button("다음", key="page3_next_button"):
+            # '궁금한 건 다 물어봤어' 메시지로 대화 종료 후 최종 결과 정리
             st.session_state["step"] = 4
             st.session_state["feedback_saved"] = False
             st.rerun()
@@ -309,11 +311,11 @@ def save_feedback_to_db(feedback):
         return False  # 저장 실패
 
 # 페이지 4: 문제 풀이 과정 출력
+# 페이지 4: 문제 풀이 과정 출력
 def page_4():
     st.title("수학여행 도우미의 제안")
     st.write("수학여행 도우미가 대화 내용을 정리 중입니다. 잠시만 기다려주세요.")
 
-    # 페이지 4로 돌아올 때마다 새로운 피드백 생성
     if not st.session_state.get("feedback_saved", False):
         # 대화 기록을 기반으로 풀이 과정 작성
         chat_history = "\n".join(f"{msg['role']}: {msg['content']}" for msg in st.session_state["messages"])
@@ -322,10 +324,9 @@ def page_4():
 
 {chat_history}
 
----
+--- 
 
 1. 아래 조건을 반드시 확인하세요:
-
 - 대화 중에 **"[다음] 버튼을 눌러도 됩니다"** 또는 이와 같은 의미의 문장이 포함되어 있는지 철저히 확인하세요.
 - 포함되어 있지 않다면, 아래 문장을 그대로 출력하고 종료하세요:
   → "[이전] 버튼을 눌러 수학여행 도우미와 더 대화해야 합니다"
@@ -348,10 +349,9 @@ def page_4():
   - 문제 풀이 과정을 간결히 요약하고, LaTeX 수식으로 최종 정답을 제시하세요.
 
 - **정답을 제시하지 못했거나 오답을 제시한 경우**:
-- 문제 해결에 필요한 핵심 개념, 공식, 전략만 정리하세요. 설명은 생략하고 수식만 제시하세요.
-
-반드시 위 형식을 따르고, 항목 순서를 변경하지 마세요.
+  - 문제 해결에 필요한 핵심 개념, 공식, 전략만 정리하세요. 설명은 생략하고 수식만 제시하세요.
 """  
+
         # OpenAI API 호출
         response = client.chat.completions.create(
             model=MODEL,
@@ -362,31 +362,29 @@ def page_4():
     # 피드백 출력
     st.subheader("📋 생성된 피드백")
     st.write(st.session_state["experiment_plan"])
-
-    # 새로운 변수에 대화 내용과 피드백을 통합
+    
+    # 피드백 저장 로직 및 이전/다음 버튼 처리
     if "all_data" not in st.session_state:
         st.session_state["all_data"] = []
-
-    all_data_to_store = st.session_state["messages"] + [{"role": "assistant", "content": st.session_state["experiment_plan"]}]
-
+    
     # 중복 저장 방지: 피드백 저장 여부 확인
     if "feedback_saved" not in st.session_state:
-        st.session_state["feedback_saved"] = False  # 초기화
-
+        st.session_state["feedback_saved"] = False
+    
     if not st.session_state["feedback_saved"]:
         # 새로운 데이터(all_data_to_store)를 MySQL에 저장
-       if save_to_mongo(all_data_to_store):
-         st.session_state["feedback_saved"] = True
-       else:
-         st.error("저장에 실패했습니다. 다시 시도해주세요.")
-
-    # 이전 버튼 (페이지 3으로 이동 시 피드백 삭제)
-    if st.button("이전", key="page4_back_button"):
+        if save_to_mongo(st.session_state["all_data"] + [{"role": "assistant", "content": st.session_state["experiment_plan"]}]):
+            st.session_state["feedback_saved"] = True
+        else:
+            st.error("저장에 실패했습니다. 다시 시도해주세요.")
+    
+    if st.button("이전"):
         st.session_state["step"] = 3
-        if "experiment_plan" in st.session_state:
-            del st.session_state["experiment_plan"]  # 피드백 삭제
-        st.session_state["feedback_saved"] = False  # 피드백 재생성 플래그 초기화
         st.rerun()
+    if st.button("다음"):
+        st.session_state["step"] = 5
+        st.rerun()
+
 
 # 메인 로직
 if "step" not in st.session_state:
