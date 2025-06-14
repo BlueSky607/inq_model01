@@ -7,8 +7,7 @@ from datetime import datetime
 from pymongo import MongoClient as PyMongoClient
 import streamlit as st
 
-
-# 환경 변수 로드
+# 📌 환경 변수 로드
 load_dotenv()
 OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
 MODEL = 'gpt-4o'
@@ -24,6 +23,12 @@ collection_feedback = db[st.secrets["MONGO_COLLECTION_FEEDBACK"]]
 
 # 페이지 기본 설정
 st.set_page_config(page_title="수학여행 도우미", page_icon="🧠", layout="wide")
+
+# 🧠 종료 유도 문구 판단 함수
+def contains_next_button_instruction(text):
+    keywords = ["다음 버튼", "다음 단계로", "[다음]"]
+    return any(keyword in text for keyword in keywords)
+
 
 # 초기 프롬프트
 initial_prompt = '''
@@ -194,7 +199,6 @@ def page_2():
             st.rerun()
 
 # 페이지 3: GPT와 대화
-# 페이지 3: GPT와 대화
 def page_3():
     st.title("수학여행 도우미 활용하기")
     st.write("수학여행 도우미와 대화를 나누며 수학을 설계하세요.")
@@ -213,12 +217,7 @@ def page_3():
     if "recent_message" not in st.session_state:
         st.session_state["recent_message"] = {"user": "", "assistant": ""}
 
-    user_input = st.text_area(
-        "You: ",
-        value=st.session_state["user_input_temp"],
-        key="user_input",
-        on_change=lambda: st.session_state.update({"user_input_temp": st.session_state["user_input"]}),
-    )
+    user_input = st.text_area("You: ", value=st.session_state["user_input_temp"], key="user_input")
 
     col1, col2 = st.columns([1, 1])
 
@@ -232,14 +231,19 @@ def page_3():
 
     with col2:
         if st.button("마침"):
-            # 마침 버튼 클릭 시 내부적으로 '궁금한 건 다 물어봤어' 전송
             final_input = "궁금한 건 다 물어봤어"
             assistant_response = get_chatgpt_response(final_input)
             st.session_state["recent_message"] = {"user": final_input, "assistant": assistant_response}
             st.session_state["user_input_temp"] = ""
+
+            # ✅ 여기서 종료 안내 여부 판단
+            if contains_next_button_instruction(assistant_response):
+                st.session_state["step"] = 4
+            else:
+                st.warning("아직 수학여행 도우미가 '다음 단계로 넘어가도 됩니다'라고 하지 않았어요.")
             st.rerun()
 
-    # 최근 대화 출력
+    # 📝 최근 대화 출력
     st.subheader("📌 최근 대화")
     if st.session_state["recent_message"]["user"] or st.session_state["recent_message"]["assistant"]:
         st.write(f"**You:** {st.session_state['recent_message']['user']}")
@@ -247,7 +251,7 @@ def page_3():
     else:
         st.write("아직 최근 대화가 없습니다.")
 
-    # 누적 대화 출력
+    # 💬 누적 대화 출력
     st.subheader("📜 누적 대화 목록")
     if st.session_state["messages"]:
         for message in st.session_state["messages"]:
@@ -265,119 +269,149 @@ def page_3():
             st.rerun()
     with col4:
         if st.button("다음", key="page3_next_button"):
-            # '궁금한 건 다 물어봤어' 메시지로 대화 종료 후 최종 결과 정리
-            st.session_state["step"] = 4
-            st.session_state["feedback_saved"] = False
+            st.warning("‘마침’ 버튼을 눌러 수학여행 도우미가 대화를 종료해도 된다고 해야 합니다.")
+
+# 페이지 4: 문제 풀이 과정 출력
+# 🔼 기존 import 유지
+import pymysql
+from openai import OpenAI
+import os
+import json
+from dotenv import load_dotenv
+from datetime import datetime
+from pymongo import MongoClient as PyMongoClient
+import streamlit as st
+
+# 📌 환경 변수 로드
+load_dotenv()
+OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
+MODEL = 'gpt-4o'
+
+# OpenAI API 설정
+client = OpenAI(api_key=OPENAI_API_KEY)
+
+# MongoDB 설정
+mongo_client = PyMongoClient(st.secrets["MONGO_URI"])
+db = mongo_client[st.secrets["MONGO_DB"]]
+collection = db[st.secrets["MONGO_COLLECTION"]]
+collection_feedback = db[st.secrets["MONGO_COLLECTION_FEEDBACK"]]
+
+# 페이지 기본 설정
+st.set_page_config(page_title="수학여행 도우미", page_icon="🧠", layout="wide")
+
+# 🧠 종료 유도 문구 판단 함수
+def contains_next_button_instruction(text):
+    keywords = ["다음 버튼", "다음 단계로", "[다음]"]
+    return any(keyword in text for keyword in keywords)
+
+# ✏️ 초기 프롬프트
+initial_prompt = '''(생략: 기존 initial_prompt 내용 그대로 유지)'''
+
+# 세션 초기화
+if "messages" not in st.session_state:
+    st.session_state["messages"] = []
+
+# ... 생략: save_to_mongo(), get_chatgpt_response(), page_1(), page_2() 함수는 기존과 동일
+
+# 🧠 page_3: 대화
+def page_3():
+    st.title("수학여행 도우미 활용하기")
+    st.write("수학여행 도우미와 대화를 나누며 수학을 설계하세요.")
+
+    if not st.session_state.get("user_number") or not st.session_state.get("user_name"):
+        st.error("학번과 이름이 누락되었습니다. 다시 입력해주세요.")
+        st.session_state["step"] = 1
+        st.rerun()
+
+    if "messages" not in st.session_state:
+        st.session_state["messages"] = []
+
+    if "user_input_temp" not in st.session_state:
+        st.session_state["user_input_temp"] = ""
+
+    if "recent_message" not in st.session_state:
+        st.session_state["recent_message"] = {"user": "", "assistant": ""}
+
+    user_input = st.text_area("You: ", value=st.session_state["user_input_temp"], key="user_input")
+
+    col1, col2 = st.columns([1, 1])
+
+    with col1:
+        if st.button("전송"):
+            if user_input.strip():
+                assistant_response = get_chatgpt_response(user_input)
+                st.session_state["recent_message"] = {"user": user_input, "assistant": assistant_response}
+                st.session_state["user_input_temp"] = ""
+                st.rerun()
+
+    with col2:
+        if st.button("마침"):
+            final_input = "궁금한 건 다 물어봤어"
+            assistant_response = get_chatgpt_response(final_input)
+            st.session_state["recent_message"] = {"user": final_input, "assistant": assistant_response}
+            st.session_state["user_input_temp"] = ""
+
+            # ✅ 여기서 종료 안내 여부 판단
+            if contains_next_button_instruction(assistant_response):
+                st.session_state["step"] = 4
+            else:
+                st.warning("아직 수학여행 도우미가 '다음 단계로 넘어가도 됩니다'라고 하지 않았어요.")
             st.rerun()
 
-# 피드백 저장 함수
-def save_feedback_to_db(feedback):
-    number = st.session_state.get('user_number', '').strip()
-    name = st.session_state.get('user_name', '').strip()
+    # 📝 최근 대화 출력
+    st.subheader("📌 최근 대화")
+    if st.session_state["recent_message"]["user"] or st.session_state["recent_message"]["assistant"]:
+        st.write(f"**You:** {st.session_state['recent_message']['user']}")
+        st.write(f"**수학여행 도우미:** {st.session_state['recent_message']['assistant']}")
+    else:
+        st.write("아직 최근 대화가 없습니다.")
 
-    if not number or not name:  # 학번과 이름 확인
-        st.error("사용자 학번과 이름을 입력해야 합니다.")
-        return False  # 저장 실패
+    # 💬 누적 대화 출력
+    st.subheader("📜 누적 대화 목록")
+    if st.session_state["messages"]:
+        for message in st.session_state["messages"]:
+            if message["role"] == "user":
+                st.write(f"**You:** {message['content']}")
+            elif message["role"] == "assistant":
+                st.write(f"**수학여행 도우미:** {message['content']}")
+    else:
+        st.write("아직 대화 기록이 없습니다.")
 
-    try:
-        db = pymysql.connect(
-            host=st.secrets["DB_HOST"],
-            user=st.secrets["DB_USER"],
-            password=st.secrets["DB_PASSWORD"],
-            database=st.secrets["DB_DATABASE"],
-            charset="utf8mb4",  # UTF-8 지원
-            autocommit=True  # 자동 커밋 활성화
-        )
-        cursor = db.cursor()
-        now = datetime.now()
+    col3, col4 = st.columns([1, 1])
+    with col3:
+        if st.button("이전"):
+            st.session_state["step"] = 2
+            st.rerun()
+    with col4:
+        if st.button("다음", key="page3_next_button"):
+            st.warning("‘마침’ 버튼을 눌러 수학여행 도우미가 대화를 종료해도 된다고 해야 합니다.")
 
-        sql = """
-        INSERT INTO feedback (number, name, feedback, time)
-        VALUES (%s, %s, %s, %s)
-        """
-        val = (number, name, feedback, now)
-
-        # SQL 실행
-        cursor.execute(sql, val)
-        cursor.close()
-        db.close()
-        st.success("피드백이 성공적으로 저장되었습니다.")
-        return True  # 저장 성공
-    except pymysql.MySQLError as db_err:
-        st.error(f"DB 처리 중 오류가 발생했습니다: {db_err}")
-        return False  # 저장 실패
-    except Exception as e:
-        st.error(f"알 수 없는 오류가 발생했습니다: {e}")
-        return False  # 저장 실패
-
-# 페이지 4: 문제 풀이 과정 출력
-# 페이지 4: 문제 풀이 과정 출력
+# 🧠 page_4: 요약 및 피드백
 def page_4():
     st.title("수학여행 도우미의 제안")
-    st.write("수학여행 도우미가 대화 내용을 정리 중입니다. 잠시만 기다려주세요.")
 
     if not st.session_state.get("feedback_saved", False):
-        # 대화 기록을 기반으로 풀이 과정 작성
-        chat_history = "\n".join(f"{msg['role']}: {msg['content']}" for msg in st.session_state["messages"])
-        prompt = f"""
-다음은 학생과 수학여행 도우미의 대화 기록입니다:
+        st.write("수학여행 도우미가 대화 내용을 정리 중입니다. 잠시만 기다려주세요...")
 
-{chat_history}
+        # 마지막 assistant 메시지를 그대로 사용
+        summary_response = st.session_state["messages"][-1]["content"]
+        st.session_state["experiment_plan"] = summary_response
 
---- 
-
-1. 아래 조건을 반드시 확인하세요:
-- 대화 중에 **"[다음] 버튼을 눌러도 됩니다"** 또는 이와 같은 의미의 문장이 포함되어 있는지 철저히 확인하세요.
-- 포함되어 있지 않다면, 아래 문장을 그대로 출력하고 종료하세요:
-  → "[이전] 버튼을 눌러 수학여행 도우미와 더 대화해야 합니다"
-- 실수 방지를 위해 **대화를 끝까지 정밀하게 검토**하세요.
-
----
-
-2. [다음] 버튼을 눌러도 된다는 내용이 포함된 경우, 아래 3가지를 포함하여 피드백을 작성하세요:
-
-📌 **1. 대화 내용 요약**  
-- 학생이 어떤 개념을 시도했고, 어떤 실수를 했으며 어떻게 수정했는지를 중심으로 요약하세요.  
-- 가독성을 위해 문단마다 줄바꿈을 사용하세요.
-
-💬 **2. 문제해결 능력 피드백**  
-- 개념 적용, 전략적 사고, 자기주도성, 오개념 교정 등의 측면에서 평가하세요.
-
-🧾 **3. 수학적 결과 또는 전략 정리 (조건 분기)**
-
-- **학생이 정확한 정답을 제시한 경우**:
-  - 문제 풀이 과정을 간결히 요약하고, LaTeX 수식으로 최종 정답을 제시하세요.
-
-- **정답을 제시하지 못했거나 오답을 제시한 경우**:
-  - 문제 해결에 필요한 핵심 개념, 공식, 전략만 정리하세요. 설명은 생략하고 수식만 제시하세요.
-"""  
-
-        # OpenAI API 호출
-        response = client.chat.completions.create(
-            model=MODEL,
-            messages=[{"role": "system", "content": prompt}]
-        )
-        st.session_state["experiment_plan"] = response.choices[0].message.content
-
-    # 피드백 출력
     st.subheader("📋 생성된 피드백")
     st.write(st.session_state["experiment_plan"])
-    
-    # 피드백 저장 로직 및 이전/다음 버튼 처리
+
     if "all_data" not in st.session_state:
         st.session_state["all_data"] = []
-    
-    # 중복 저장 방지: 피드백 저장 여부 확인
+
     if "feedback_saved" not in st.session_state:
         st.session_state["feedback_saved"] = False
-    
+
     if not st.session_state["feedback_saved"]:
-        # 새로운 데이터(all_data_to_store)를 MySQL에 저장
         if save_to_mongo(st.session_state["all_data"] + [{"role": "assistant", "content": st.session_state["experiment_plan"]}]):
             st.session_state["feedback_saved"] = True
         else:
             st.error("저장에 실패했습니다. 다시 시도해주세요.")
-    
+
     if st.button("이전"):
         st.session_state["step"] = 3
         st.rerun()
@@ -385,8 +419,7 @@ def page_4():
         st.session_state["step"] = 5
         st.rerun()
 
-
-# 메인 로직
+# 메인 실행 로직
 if "step" not in st.session_state:
     st.session_state["step"] = 1
 
