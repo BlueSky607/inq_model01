@@ -135,6 +135,16 @@ def get_chatgpt_response(prompt):
     st.session_state["messages"].append({"role": "assistant", "content": answer})
     return answer
 
+# 세션 상태를 초기화하는 함수 (처음으로 돌아갈 때 사용)
+def reset_session_state():
+    for key in list(st.session_state.keys()):
+        if key not in ["user_number", "user_name"]: # 학번과 이름은 유지
+            del st.session_state[key]
+    st.session_state["messages"] = []
+    st.session_state["chat_ended"] = False
+    st.session_state["user_said_finish"] = False
+    st.session_state["feedback_saved"] = False # 피드백 저장 플래그도 초기화
+
 # 페이지 1: 학번 및 이름 입력
 def page_1():
     st.title("수학여행 도우미 챗봇 M1")
@@ -278,10 +288,15 @@ def page_3():
             st.session_state["user_said_finish"] = False # 플래그 초기화
             st.rerun()
     with col4:
-        if st.button("다음", key="page3_next_button"):
-            st.session_state["step"] = 4
-            st.session_state["feedback_saved"] = False
-            st.rerun()
+        # '다음' 버튼은 '마침'을 눌러 대화가 종료된 후에만 유효하도록 변경
+        if st.session_state.get("chat_ended", False):
+            if st.button("다음", key="page3_next_button_enabled"):
+                st.session_state["step"] = 4
+                st.session_state["feedback_saved"] = False
+                st.rerun()
+        else:
+            st.button("다음", key="page3_next_button_disabled", disabled=True) # 대화 종료 전에는 비활성화
+
 
 # 피드백 저장 함수
 def save_feedback_to_db(feedback):
@@ -318,10 +333,9 @@ def save_feedback_to_db(feedback):
         return True  # 저장 성공
     except pymysql.MySQLError as db_err:
         st.error(f"DB 처리 중 오류가 발생했습니다: {db_err}")
-        return False  # 저장 실패
     except Exception as e:
         st.error(f"알 수 없는 오류가 발생했습니다: {e}")
-        return False  # 저장 실패
+    return False  # 저장 실패
 
 # 페이지 4: 문제 풀이 과정 출력
 def page_4():
@@ -397,16 +411,27 @@ def page_4():
             st.session_state["feedback_saved"] = True
         else:
             st.error("저장에 실패했습니다. 다시 시도해주세요.")
+    else:
+        st.info("이미 피드백이 저장되었습니다.")
 
-    # 이전 버튼 (페이지 3으로 이동 시 피드백 삭제)
-    if st.button("이전", key="page4_back_button"):
-        st.session_state["step"] = 3
-        if "experiment_plan" in st.session_state:
-            del st.session_state["experiment_plan"]  # 피드백 삭제
-        st.session_state["feedback_saved"] = False  # 피드백 재생성 플래그 초기화
-        st.session_state["chat_ended"] = False # 이전으로 돌아가면 채팅 종료 플래그 초기화
-        st.session_state["user_said_finish"] = False # 플래그 초기화
-        st.rerun()
+
+    # 새로운 버튼들
+    col_end1, col_end2 = st.columns([1, 1])
+
+    with col_end1:
+        if st.button("저장 후 종료", key="save_and_exit_button"):
+            # 저장 로직은 이미 위에 구현되어 있음 (feedback_saved 플래그로 중복 방지)
+            st.success("대화 기록이 성공적으로 저장되었습니다. 프로그램을 종료합니다.")
+            st.stop() # Streamlit 앱 종료 (실제 환경에서는 다르게 동작할 수 있음)
+            
+    with col_end2:
+        if st.button("처음으로", key="start_over_button"):
+            # 저장 로직은 이미 위에 구현되어 있음 (feedback_saved 플래그로 중복 방지)
+            st.success("대화 기록이 성공적으로 저장되었습니다. 처음 페이지로 돌아갑니다.")
+            reset_session_state() # 세션 상태 초기화
+            st.session_state["step"] = 1 # 첫 페이지로 이동
+            st.rerun()
+
 
 # 메인 로직
 if "step" not in st.session_state:
@@ -420,7 +445,6 @@ elif st.session_state["step"] == 3:
     page_3()
 elif st.session_state["step"] == 4:
     page_4()
-
 
 
 
