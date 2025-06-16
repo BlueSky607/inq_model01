@@ -75,7 +75,7 @@ initial_prompt = '''
 
 # 세션 상태 초기화
 if "messages" not in st.session_state:
-    st.session_state["messages"] = []
+    st.session_state["messages"] = []
 if "chat_ended" not in st.session_state:
     st.session_state["chat_ended"] = False
 if "user_said_finish" not in st.session_state:
