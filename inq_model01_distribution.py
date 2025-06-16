@@ -84,7 +84,7 @@ if "user_said_finish" not in st.session_state:
 # MongoDB 저장 함수
 def save_to_mongo(all_data):
     number = st.session_state.get('user_number','').strip()
-    name = st.session_state.get('user_name','').strip()
+    name = st.session_state.get('user_name','').strip()
 
     if not number or not name:
         st.error("사용자 학번과 이름을 입력해야 합니다.")
