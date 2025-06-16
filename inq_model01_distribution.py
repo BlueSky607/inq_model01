@@ -67,15 +67,15 @@ initial_prompt = '''
 - 수식 문법 오류가 있어도 에러 메시지를 출력하지 않고 자연스럽게 올바른 표현으로 안내한다.
 
 **종료 조건**:
-- 학생이 “마침” 또는 "궁금한 건 다 물어봤어"이라고 말하면, 지금까지의 대화 내용을 요약해줘.
+- 학생이  "궁금한 건 다 물어봤어" 또는 "마침"이라고 말하면, 지금까지의 대화 내용을 요약해줘.
   - 학생이 스스로 정답을 말한 경우: 가이드 답안을 제공하고 추가 문제를 제시해 줘
-  - 정답을 말하지 못한 경우: 정답을 언급하지 않고 사용한 접근 방식이나 전략만 정리해 줘.
+  - 정답을 말하지 않은 경우: 정답을 언급하지 않고 사용한 접근 방식이나 전략만 정리해 줘.
   - 마지막엔 “이제 [다음] 버튼을 눌러 마무리해 줘!”라고 안내해.
 '''
 
 # 세션 상태 초기화
 if "messages" not in st.session_state:
-    st.session_state["messages"] = []
+    st.session_state["messages"] = []
 if "chat_ended" not in st.session_state:
     st.session_state["chat_ended"] = False
 if "user_said_finish" not in st.session_state:
@@ -420,7 +420,6 @@ elif st.session_state["step"] == 3:
     page_3()
 elif st.session_state["step"] == 4:
     page_4()
-
 
 
 
